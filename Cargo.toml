@@ -1,16 +1,16 @@
 [package]
-name = "grok"
+name = "grok2"
 version = "2.0.0" # remember to update html_root_url
-authors = ["Michael Nitschinger <michael@nitschinger.at>"]
+authors = ["Matt Mastracci <matthew@mastracci.com>", "Michael Nitschinger <michael@nitschinger.at>"]
 license = "Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/daschl/grok"
-documentation = "https://docs.rs/grok"
-homepage = "https://github.com/daschl/grok"
+repository = "https://github.com/mmastrac/grok"
+documentation = "https://docs.rs/grok2"
+homepage = "https://github.com/mmastrac/grok"
 description = """
 A rust implementation of the popular java & ruby grok library
 which allows easy text and log file processing with composable 
-patterns.
+patterns. A fork of the grok crate.
 """
 categories = ["text-processing"]
 build = "build.rs"
@@ -18,7 +18,7 @@ edition = "2021"
 rust-version = "1.56"
 
 [dependencies]
-onig = { version = "6.4", default-features = false }
+onig = { version = "6.5", default-features = false }
 
 [build-dependencies]
 glob = "0.3"
