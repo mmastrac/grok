@@ -1,3 +1,5 @@
+//! This is a fork of the [grok](https://github.com/daschl/grok) library.
+//! 
 //! The `grok` library allows you to quickly parse and match potentially unstructured data
 //! into a structed result. It is especially helpful when parsing logfiles of all kinds. This
 //! [Rust](http://rust-lang.org) version is mainly a port from the
