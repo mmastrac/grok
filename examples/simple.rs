@@ -1,4 +1,4 @@
-use grok::Grok;
+use grok2::Grok;
 
 fn main() {
     // Instantiate Grok

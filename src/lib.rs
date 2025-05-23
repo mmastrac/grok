@@ -8,7 +8,7 @@
 
 include!(concat!(env!("OUT_DIR"), "/default_patterns.rs"));
 
-use onig::{Captures, Regex};
+use onig::{MatchParam, Regex, Region, SearchOptions};
 use std::collections::btree_map::Iter as MapIter;
 use std::collections::{BTreeMap, HashMap};
 use std::error::Error as StdError;
@@ -25,6 +25,34 @@ const DEFINITION_INDEX: usize = 4;
 /// Returns the default patterns, also used by the default constructor of `Grok`.
 pub fn patterns<'a>() -> &'a [(&'a str, &'a str)] {
     PATTERNS
+}
+
+#[derive(Debug)]
+pub struct Captures<'a> {
+    text: &'a str,
+    region: Region,
+    offset: usize,
+}
+
+impl<'a> Captures<'a> {
+    pub fn at(&self, pos: usize) -> Option<&'a str> {
+        self.region
+            .pos(pos)
+            .map(|(start, end)| &self.text[start..end])
+    }
+
+    pub fn len(&self) -> usize {
+        self.region.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Offset of the captures within the given string slice.
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
 }
 
 /// The `Matches` represent matched results from a `Pattern` against a provided text.
@@ -131,9 +159,24 @@ impl Pattern {
 
     /// Matches this compiled `Pattern` against the text and returns the matches.
     pub fn match_against<'a>(&'a self, text: &'a str) -> Option<Matches<'a>> {
-        self.regex
-            .captures(text)
-            .map(|cap| Matches::new(cap, &self.names))
+        // Inlined version of the onig methods that cause an internal panic
+        let this = &self.regex;
+        let mut region = Region::new();
+        let to = text.len();
+        let options = SearchOptions::SEARCH_OPTION_NONE;
+        let match_param = MatchParam::default();
+        let result = this.search_with_param(text, 0, to, options, Some(&mut region), match_param);
+
+        match result {
+            Ok(r) => r,
+            Err(_) => None,
+        }
+        .map(|pos| Captures {
+            text: text,
+            region,
+            offset: pos,
+        })
+        .map(|cap| Matches::new(cap, &self.names))
     }
 
     /// Returns all names this `Pattern` captures.
@@ -685,5 +728,17 @@ mod tests {
         let expected = vec!["SPACE", "YEAR", "user"];
         let actual = pattern.capture_names().collect::<Vec<_>>();
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_capture_error() {
+        let mut grok = Grok::with_default_patterns();
+        let pattern = grok
+            .compile("Path: %{PATH}$", false)
+            .expect("Error while compiling!");
+        let matches = pattern
+            .match_against("Path: /AAAAA/BBBBB/CCCCC/DDDDDDDDDDDDDD EEEEEEEEEEEEEEEEEEEEEEEE/");
+
+        assert!(matches.is_none());
     }
 }
