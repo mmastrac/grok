@@ -16,22 +16,39 @@ use std::fmt;
 mod fancy_regex;
 #[cfg(feature = "onig")]
 mod onig;
+#[cfg(feature = "pcre2")]
+mod pcre2;
 #[cfg(feature = "regex")]
 mod regex;
 
-// If fancy-regex is enabled, we use it. Otherwise if onig is enabled, use that.
-// Only use regex if it is enabled and no other feature is enabled.
+// Enable features in the following preferred order. If multiple features are
+// enabled, the first one in the list is used.
 
-#[cfg(feature = "fancy-regex")]
+// 0. pcre2
+// 1. fancy-regex
+// 3. onig
+// 3. regex
+
+#[cfg(feature = "pcre2")]
+pub use pcre2::{
+    Pcre2Matches as Matches, Pcre2MatchesIter as MatchesIter, Pcre2Pattern as Pattern,
+};
+
+#[cfg(all(not(feature = "pcre2"), feature = "fancy-regex"))]
 pub use fancy_regex::{
     FancyRegexMatches as Matches, FancyRegexMatchesIter as MatchesIter,
     FancyRegexPattern as Pattern,
 };
 
-#[cfg(all(feature = "onig", not(feature = "fancy-regex")))]
+#[cfg(all(not(feature = "pcre2"), not(feature = "fancy-regex"), feature = "onig"))]
 pub use onig::{OnigMatches as Matches, OnigMatchesIter as MatchesIter, OnigPattern as Pattern};
 
-#[cfg(all(not(feature = "onig"), not(feature = "fancy-regex"), feature = "regex"))]
+#[cfg(all(
+    not(feature = "pcre2"),
+    not(feature = "fancy-regex"),
+    not(feature = "onig"),
+    feature = "regex"
+))]
 pub use regex::{
     RegexMatches as Matches, RegexMatchesIter as MatchesIter, RegexPattern as Pattern,
 };
@@ -39,7 +56,8 @@ pub use regex::{
 #[cfg(all(
     not(feature = "onig"),
     not(feature = "fancy-regex"),
-    not(feature = "regex")
+    not(feature = "regex"),
+    not(feature = "pcre2")
 ))]
 compile_error!("No regex engine selected. Please enable one of the following features: fancy-regex, onig, regex");
 

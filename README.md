@@ -55,11 +55,19 @@ powerful [Oniguruma](https://github.com/kkos/oniguruma) regex library. You can
 also use the standard Rust regex engine or fancy-regex by enabling the
 respective features:
 
-The default engine, and at this time the most performant one, is `onig`:
+The default engine is `onig` for compatibility with previous 2.x releases:
 
 ```toml
 [dependencies]
 grok = { version = "2.0", features = ["onig"] }
+```
+
+The `pcre2` engine is a more complete Rust regex library supporting
+backtracking, JIT compilation and is the fastest engine for most use cases:
+
+```toml
+[dependencies]
+grok = { version = "2.0", default-features = false, features = ["pcre2"] }
 ```
 
 The `fancy-regex` engine is a more complete Rust regex library supporting
