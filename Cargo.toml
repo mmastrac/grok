@@ -17,8 +17,17 @@ build = "build.rs"
 edition = "2021"
 rust-version = "1.56"
 
+[features]
+default = ["onig"]
+
+onig = []
+regex = []
+fancy-regex = []
+
 [dependencies]
 onig = { version = "6.5", default-features = false }
+regex = { version = "1", default-features = false, features = ["std", "unicode", "perf", "perf-dfa-full"] }
+fancy-regex = { version = "0.14", default-features = false, features = ["std", "unicode", "perf"] }
 
 [build-dependencies]
 glob = "0.3"
