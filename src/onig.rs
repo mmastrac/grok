@@ -46,7 +46,11 @@ impl OnigPattern {
             Ok(r) => r,
             Err(_) => None,
         }
-        .map(|_| OnigMatches::new(text, region, self))
+        .map(|_| OnigMatches {
+            text,
+            region,
+            pattern: self,
+        })
     }
 
     /// Returns all names this `Pattern` captures.
@@ -64,19 +68,6 @@ pub struct OnigMatches<'a> {
 }
 
 impl<'a> OnigMatches<'a> {
-    /// Instantiates the matches for a pattern after the match.
-    pub(crate) fn new(
-        text: &'a str,
-        region: Region,
-        pattern: &'a crate::onig::OnigPattern,
-    ) -> Self {
-        OnigMatches {
-            text,
-            region,
-            pattern,
-        }
-    }
-
     /// Gets the value for the name (or) alias if found, `None` otherwise.
     pub fn get(&self, name_or_alias: &str) -> Option<&str> {
         match self.pattern.names.get(name_or_alias) {

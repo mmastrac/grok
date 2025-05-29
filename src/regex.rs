@@ -36,7 +36,6 @@ impl RegexPattern {
     /// Matches this compiled `Pattern` against the text and returns the matches.
     pub fn match_against<'a>(&'a self, text: &'a str) -> Option<RegexMatches<'a>> {
         self.regex.captures(text).map(|caps| RegexMatches {
-            text,
             captures: caps,
             pattern: self,
         })
@@ -51,21 +50,11 @@ impl RegexPattern {
 /// The `Matches` represent matched results from a `Pattern` against a provided text.
 #[derive(Debug)]
 pub struct RegexMatches<'a> {
-    text: &'a str,
     captures: Captures<'a>,
     pattern: &'a RegexPattern,
 }
 
 impl<'a> RegexMatches<'a> {
-    /// Instantiates the matches for a pattern after the match.
-    pub(crate) fn new(text: &'a str, captures: Captures<'a>, pattern: &'a RegexPattern) -> Self {
-        RegexMatches {
-            text,
-            captures,
-            pattern,
-        }
-    }
-
     /// Gets the value for the name (or) alias if found, `None` otherwise.
     pub fn get(&self, name_or_alias: &str) -> Option<&str> {
         self.pattern
@@ -90,7 +79,6 @@ impl<'a> RegexMatches<'a> {
     /// Note that if no match is found, the value is empty.
     pub fn iter(&'a self) -> RegexMatchesIter<'a> {
         RegexMatchesIter {
-            text: &self.text,
             captures: &self.captures,
             names: self.pattern.names.iter(),
         }
@@ -108,7 +96,6 @@ impl<'a> IntoIterator for &'a RegexMatches<'a> {
 
 /// An `Iterator` over all matches, accessible via `Matches`.
 pub struct RegexMatchesIter<'a> {
-    text: &'a str,
     captures: &'a Captures<'a>,
     names: btree_map::Iter<'a, String, usize>,
 }

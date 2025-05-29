@@ -6,7 +6,7 @@ use std::collections::{btree_map, BTreeMap, HashMap};
 #[derive(Debug)]
 pub struct FancyRegexPattern {
     regex: Regex,
-    pub(crate) names: BTreeMap<String, usize>,
+    names: BTreeMap<String, usize>,
 }
 
 impl FancyRegexPattern {
@@ -37,7 +37,6 @@ impl FancyRegexPattern {
     pub fn match_against<'a>(&'a self, text: &'a str) -> Option<FancyRegexMatches<'a>> {
         self.regex.captures(text).ok().flatten().and_then(|caps| {
             Some(FancyRegexMatches {
-                text,
                 captures: caps,
                 pattern: self,
             })
@@ -53,25 +52,11 @@ impl FancyRegexPattern {
 /// The `Matches` represent matched results from a `Pattern` against a provided text.
 #[derive(Debug)]
 pub struct FancyRegexMatches<'a> {
-    text: &'a str,
     captures: Captures<'a>,
     pattern: &'a FancyRegexPattern,
 }
 
 impl<'a> FancyRegexMatches<'a> {
-    /// Instantiates the matches for a pattern after the match.
-    pub(crate) fn new(
-        text: &'a str,
-        captures: Captures<'a>,
-        pattern: &'a FancyRegexPattern,
-    ) -> Self {
-        FancyRegexMatches {
-            text,
-            captures,
-            pattern,
-        }
-    }
-
     /// Gets the value for the name (or) alias if found, `None` otherwise.
     pub fn get(&self, name_or_alias: &str) -> Option<&str> {
         self.pattern
@@ -96,7 +81,6 @@ impl<'a> FancyRegexMatches<'a> {
     /// Note that if no match is found, the value is empty.
     pub fn iter(&'a self) -> FancyRegexMatchesIter<'a> {
         FancyRegexMatchesIter {
-            text: &self.text,
             captures: &self.captures,
             names: self.pattern.names.iter(),
         }
@@ -114,7 +98,6 @@ impl<'a> IntoIterator for &'a FancyRegexMatches<'a> {
 
 /// An `Iterator` over all matches, accessible via `Matches`.
 pub struct FancyRegexMatchesIter<'a> {
-    text: &'a str,
     captures: &'a Captures<'a>,
     names: btree_map::Iter<'a, String, usize>,
 }
