@@ -1,5 +1,5 @@
-grok2
-=====
+grok
+====
 
 The `grok` library allows you to quickly parse and match potentially unstructured data into a structed result. It is especially helpful when parsing logfiles of all kinds. This [Rust](http://rust-lang.org) version is mainly a port from the [java version](https://github.com/thekrakken/java-grok) which in turn drew inspiration from the original [ruby version](https://github.com/logstash-plugins/logstash-filter-grok).
 
