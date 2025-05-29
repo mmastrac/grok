@@ -26,10 +26,9 @@ impl OnigPattern {
                 });
                 Self { regex: r, names }
             }),
-            Err(e) => {
-                eprintln!("Regex compilation failed: {e:?}");
-                Err(Error::RegexCompilationFailed(regex.into()))
-            }
+            Err(e) => Err(Error::RegexCompilationFailed(format!(
+                "Regex compilation failed: {e:?}:\n{regex}"
+            ))),
         }
     }
 

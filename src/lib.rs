@@ -12,8 +12,11 @@ use std::collections::{BTreeMap, HashMap};
 use std::error::Error as StdError;
 use std::fmt;
 
+#[cfg(feature = "fancy-regex")]
 mod fancy_regex;
+#[cfg(feature = "onig")]
 mod onig;
+#[cfg(feature = "regex")]
 mod regex;
 
 // If fancy-regex is enabled, we use it. Otherwise if onig is enabled, use that.
@@ -537,15 +540,22 @@ mod tests {
     fn test_compilation_of_all_default_patterns() {
         let mut grok = Grok::default();
         let mut num_checked = 0;
+        let mut errors = vec![];
         for &(key, _) in PATTERNS {
             let pattern = format!("%{{{}}}", key);
-            grok.compile(&pattern, false).expect(&format!(
-                "Pattern {} key {} failed to compile!",
-                pattern, key
-            ));
+            match grok.compile(&pattern, false) {
+                Ok(_) => (),
+                Err(e) => errors.push((key, e)),
+            }
             num_checked += 1;
         }
         assert!(num_checked > 0);
+        if !errors.is_empty() {
+            for (key, e) in errors {
+                eprintln!("Pattern {} failed to compile: {}", key, e);
+            }
+            panic!("Not all patterns compiled successfully");
+        }
     }
 
     #[test]
