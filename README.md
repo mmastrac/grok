@@ -48,7 +48,35 @@ be passed freely around. For performance reasons the `Match` returned is bound t
 them close together or clone/copy out the containing results as needed.
 
 ## Further Information
-This library depends on [onig](https://crates.io/crates/onig) for its regex execution, which itself is a Rust binding for the powerful [Oniguruma](https://github.com/kkos/oniguruma) regex library. If in doubt why a specific regex doesn't work, this is the best place to look for more information what patterns are supported and how to use advanced features.
+
+This library supports multiple regex engines through feature flags. By default,
+it uses [onig](https://crates.io/crates/onig), which is a Rust binding for the
+powerful [Oniguruma](https://github.com/kkos/oniguruma) regex library. You can
+also use the standard Rust regex engine or fancy-regex by enabling the
+respective features:
+
+The default engine, and at this time the most performant one, is `onig`:
+
+```toml
+[dependencies]
+grok = { version = "2.0", features = ["onig"] }
+```
+
+The `fancy-regex` engine is a more complete Rust regex library supporting
+backtracking:
+
+```toml
+[dependencies]
+grok = { version = "2.0", default-features = false, features = ["fancy-regex"] }
+```
+
+The `regex` engine is supported, but it does not support backtracking, so many
+patterns are unusable. This is not recommended for most use cases:
+
+```toml
+[dependencies]
+grok = { version = "2.0", default-features = false, features = ["regex"] }
+```
 
 ## License
 `grok` is distributed under the terms of the Apache License (Version 2.0). 

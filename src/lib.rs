@@ -8,11 +8,40 @@
 
 include!(concat!(env!("OUT_DIR"), "/default_patterns.rs"));
 
-use onig::{MatchParam, Regex, Region, SearchOptions};
-use std::collections::btree_map::Iter as MapIter;
 use std::collections::{BTreeMap, HashMap};
 use std::error::Error as StdError;
 use std::fmt;
+
+#[cfg(feature = "fancy-regex")]
+mod fancy_regex;
+#[cfg(feature = "onig")]
+mod onig;
+#[cfg(feature = "regex")]
+mod regex;
+
+// If fancy-regex is enabled, we use it. Otherwise if onig is enabled, use that.
+// Only use regex if it is enabled and no other feature is enabled.
+
+#[cfg(feature = "fancy-regex")]
+pub use fancy_regex::{
+    FancyRegexMatches as Matches, FancyRegexMatchesIter as MatchesIter,
+    FancyRegexPattern as Pattern,
+};
+
+#[cfg(all(feature = "onig", not(feature = "fancy-regex")))]
+pub use onig::{OnigMatches as Matches, OnigMatchesIter as MatchesIter, OnigPattern as Pattern};
+
+#[cfg(all(not(feature = "onig"), not(feature = "fancy-regex"), feature = "regex"))]
+pub use regex::{
+    RegexMatches as Matches, RegexMatchesIter as MatchesIter, RegexPattern as Pattern,
+};
+
+#[cfg(all(
+    not(feature = "onig"),
+    not(feature = "fancy-regex"),
+    not(feature = "regex")
+))]
+compile_error!("No regex engine selected. Please enable one of the following features: fancy-regex, onig, regex");
 
 const MAX_RECURSION: usize = 1024;
 
@@ -25,164 +54,6 @@ const DEFINITION_INDEX: usize = 4;
 /// Returns the default patterns, also used by the default constructor of `Grok`.
 pub fn patterns<'a>() -> &'a [(&'a str, &'a str)] {
     PATTERNS
-}
-
-#[derive(Debug)]
-pub struct Captures<'a> {
-    text: &'a str,
-    region: Region,
-    offset: usize,
-}
-
-impl<'a> Captures<'a> {
-    pub fn at(&self, pos: usize) -> Option<&'a str> {
-        self.region
-            .pos(pos)
-            .map(|(start, end)| &self.text[start..end])
-    }
-
-    pub fn len(&self) -> usize {
-        self.region.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Offset of the captures within the given string slice.
-    pub fn offset(&self) -> usize {
-        self.offset
-    }
-}
-
-/// The `Matches` represent matched results from a `Pattern` against a provided text.
-#[derive(Debug)]
-pub struct Matches<'a> {
-    captures: Captures<'a>,
-    names: &'a BTreeMap<String, u32>,
-}
-
-impl<'a> Matches<'a> {
-    /// Instantiates the matches for a pattern after the match.
-    fn new(captures: Captures<'a>, names: &'a BTreeMap<String, u32>) -> Self {
-        Matches { captures, names }
-    }
-
-    /// Gets the value for the name (or) alias if found, `None` otherwise.
-    pub fn get(&self, name_or_alias: &str) -> Option<&str> {
-        match self.names.get(name_or_alias) {
-            Some(found) => self.captures.at(*found as usize),
-            None => None,
-        }
-    }
-
-    /// Returns the number of matches.
-    pub fn len(&self) -> usize {
-        self.captures.len() - 1
-    }
-
-    /// Returns true if there are no matches, false otherwise.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Returns a tuple of key/value with all the matches found.
-    ///
-    /// Note that if no match is found, the value is empty.
-    pub fn iter(&'a self) -> MatchesIter<'a> {
-        MatchesIter {
-            captures: &self.captures,
-            names: self.names.iter(),
-        }
-    }
-}
-
-impl<'a> IntoIterator for &'a Matches<'a> {
-    type Item = (&'a str, &'a str);
-    type IntoIter = MatchesIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-/// An `Iterator` over all matches, accessible via `Matches`.
-pub struct MatchesIter<'a> {
-    captures: &'a Captures<'a>,
-    names: MapIter<'a, String, u32>,
-}
-
-impl<'a> Iterator for MatchesIter<'a> {
-    type Item = (&'a str, &'a str);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        //while let Some((k, v)) = self.names.next() {
-        for (k, v) in self.names.by_ref() {
-            match self.captures.at(*v as usize) {
-                Some(value) => return Some((k.as_str(), value)),
-                None => {
-                    continue;
-                }
-            }
-        }
-        None
-    }
-}
-
-/// The `Pattern` represents a compiled regex, ready to be matched against arbitrary text.
-#[derive(Debug)]
-pub struct Pattern {
-    regex: Regex,
-    names: BTreeMap<String, u32>,
-}
-
-impl Pattern {
-    /// Creates a new pattern from a raw regex string and an alias map to identify the
-    /// fields properly.
-    fn new(regex: &str, alias: &HashMap<String, String>) -> Result<Self, Error> {
-        match Regex::new(regex) {
-            Ok(r) => Ok({
-                let mut names = BTreeMap::new();
-                r.foreach_name(|cap_name, cap_idx| {
-                    let name = match alias.iter().find(|&(_k, v)| *v == cap_name) {
-                        Some(item) => item.0.clone(),
-                        None => String::from(cap_name),
-                    };
-                    names.insert(name, cap_idx[0]);
-                    true
-                });
-                Pattern { regex: r, names }
-            }),
-            Err(_) => Err(Error::RegexCompilationFailed(regex.into())),
-        }
-    }
-
-    /// Matches this compiled `Pattern` against the text and returns the matches.
-    pub fn match_against<'a>(&'a self, text: &'a str) -> Option<Matches<'a>> {
-        // Inlined version of the onig methods that cause an internal panic
-        let this = &self.regex;
-        let mut region = Region::new();
-        let to = text.len();
-        let options = SearchOptions::SEARCH_OPTION_NONE;
-        let match_param = MatchParam::default();
-        let result = this.search_with_param(text, 0, to, options, Some(&mut region), match_param);
-
-        match result {
-            Ok(r) => r,
-            Err(_) => None,
-        }
-        .map(|pos| Captures {
-            text: text,
-            region,
-            offset: pos,
-        })
-        .map(|cap| Matches::new(cap, &self.names))
-    }
-
-    /// Returns all names this `Pattern` captures.
-    pub fn capture_names(&self) -> impl Iterator<Item = &str> {
-        self.names.keys().map(|s| s.as_str())
-    }
 }
 
 /// The `Grok` struct is the main entry point into using this library.
@@ -222,7 +93,7 @@ impl Grok {
         let mut iteration_left = MAX_RECURSION;
         let mut continue_iteration = true;
 
-        let grok_regex = match Regex::new(GROK_PATTERN) {
+        let grok_regex = match ::onig::Regex::new(GROK_PATTERN) {
             Ok(r) => r,
             Err(_) => return Err(Error::RegexCompilationFailed(GROK_PATTERN.into())),
         };
@@ -554,10 +425,15 @@ mod tests {
         let pattern = grok
             .compile("%{DAY} %{MONTH} %{YEAR}", false)
             .expect("Error while compiling!");
+        assert_eq!(
+            pattern.capture_names().collect::<Vec<_>>(),
+            vec!["DAY", "MONTH", "YEAR"]
+        );
 
         let matches = pattern
             .match_against("Monday March 2012")
             .expect("No matches found!");
+        assert_eq!(matches.len(), 3);
         assert_eq!("Monday", matches.get("DAY").unwrap());
         assert_eq!("March", matches.get("MONTH").unwrap());
         assert_eq!("2012", matches.get("YEAR").unwrap());
@@ -605,6 +481,7 @@ mod tests {
         let matches = pattern
             .match_against("Monday March 2012")
             .expect("No matches found!");
+        assert_eq!(matches.len(), 4);
         let mut found = 0;
         for (k, v) in matches.iter() {
             match k {
@@ -636,6 +513,7 @@ mod tests {
         let matches = pattern
             .match_against("Monday March 2012")
             .expect("No matches found!");
+        assert_eq!(matches.len(), 4);
         let mut found = 0;
         for (k, v) in &matches {
             match k {
@@ -669,15 +547,22 @@ mod tests {
     fn test_compilation_of_all_default_patterns() {
         let mut grok = Grok::default();
         let mut num_checked = 0;
+        let mut errors = vec![];
         for &(key, _) in PATTERNS {
             let pattern = format!("%{{{}}}", key);
-            grok.compile(&pattern, false).expect(&format!(
-                "Pattern {} key {} failed to compile!",
-                pattern, key
-            ));
+            match grok.compile(&pattern, false) {
+                Ok(_) => (),
+                Err(e) => errors.push((key, e)),
+            }
             num_checked += 1;
         }
         assert!(num_checked > 0);
+        if !errors.is_empty() {
+            for (key, e) in errors {
+                eprintln!("Pattern {} failed to compile: {}", key, e);
+            }
+            panic!("Not all patterns compiled successfully");
+        }
     }
 
     #[test]
@@ -691,6 +576,7 @@ mod tests {
             .match_against("[thread1]")
             .expect("No matches found!");
         assert_eq!("thread1", matches.get("threadname").unwrap());
+        assert_eq!(matches.len(), 1);
     }
 
     #[test]
@@ -704,6 +590,7 @@ mod tests {
             .match_against("[thread1]")
             .expect("No matches found!");
         let mut found = 0;
+        assert_eq!(matches.len(), 1);
         for (k, v) in matches.iter() {
             assert_eq!("threadname", k);
             assert_eq!("thread1", v);
