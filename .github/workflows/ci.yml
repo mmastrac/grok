@@ -35,3 +35,7 @@ jobs:
         with:
           command: test
           args: --no-default-features --features fancy-regex
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-default-features --features pcre2
