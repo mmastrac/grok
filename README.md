@@ -1,14 +1,12 @@
 grok2
 =====
 
-This is a fork of the [grok](https://github.com/daschl/grok) library.
-
-The `grok2` library allows you to quickly parse and match potentially unstructured data into a structed result. It is especially helpful when parsing logfiles of all kinds. This [Rust](http://rust-lang.org) version is mainly a port from the [java version](https://github.com/thekrakken/java-grok) which in turn drew inspiration from the original [ruby version](https://github.com/logstash-plugins/logstash-filter-grok).
+The `grok` library allows you to quickly parse and match potentially unstructured data into a structed result. It is especially helpful when parsing logfiles of all kinds. This [Rust](http://rust-lang.org) version is mainly a port from the [java version](https://github.com/thekrakken/java-grok) which in turn drew inspiration from the original [ruby version](https://github.com/logstash-plugins/logstash-filter-grok).
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Latest Version](https://img.shields.io/crates/v/grok.svg)](https://crates.io/crates/grok)
 [![Documentation](https://docs.rs/grok/badge.svg)](https://docs.rs/grok)
-![Continuous Integration](https://github.com/daschl/grok/actions/workflows/ci.yml/badge.svg?branch=main)
+![Continuous Integration](https://github.com/mmastrac/grok/actions/workflows/ci.yml/badge.svg?branch=main)
 
 ## Usage
 Add this to your `Cargo.toml`:

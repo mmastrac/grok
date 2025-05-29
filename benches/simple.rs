@@ -1,9 +1,8 @@
 #![feature(test)]
 
-extern crate grok2;
 extern crate test;
 
-use grok2::Grok;
+use grok::Grok;
 use test::Bencher;
 
 #[bench]
