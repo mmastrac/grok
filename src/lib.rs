@@ -425,10 +425,15 @@ mod tests {
         let pattern = grok
             .compile("%{DAY} %{MONTH} %{YEAR}", false)
             .expect("Error while compiling!");
+        assert_eq!(
+            pattern.capture_names().collect::<Vec<_>>(),
+            vec!["DAY", "MONTH", "YEAR"]
+        );
 
         let matches = pattern
             .match_against("Monday March 2012")
             .expect("No matches found!");
+        assert_eq!(matches.len(), 3);
         assert_eq!("Monday", matches.get("DAY").unwrap());
         assert_eq!("March", matches.get("MONTH").unwrap());
         assert_eq!("2012", matches.get("YEAR").unwrap());
@@ -476,6 +481,7 @@ mod tests {
         let matches = pattern
             .match_against("Monday March 2012")
             .expect("No matches found!");
+        assert_eq!(matches.len(), 4);
         let mut found = 0;
         for (k, v) in matches.iter() {
             match k {
@@ -507,6 +513,7 @@ mod tests {
         let matches = pattern
             .match_against("Monday March 2012")
             .expect("No matches found!");
+        assert_eq!(matches.len(), 4);
         let mut found = 0;
         for (k, v) in &matches {
             match k {
@@ -569,6 +576,7 @@ mod tests {
             .match_against("[thread1]")
             .expect("No matches found!");
         assert_eq!("thread1", matches.get("threadname").unwrap());
+        assert_eq!(matches.len(), 1);
     }
 
     #[test]
@@ -582,6 +590,7 @@ mod tests {
             .match_against("[thread1]")
             .expect("No matches found!");
         let mut found = 0;
+        assert_eq!(matches.len(), 1);
         for (k, v) in matches.iter() {
             assert_eq!("threadname", k);
             assert_eq!("thread1", v);

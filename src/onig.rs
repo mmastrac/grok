@@ -46,7 +46,7 @@ impl OnigPattern {
             Ok(r) => r,
             Err(_) => None,
         }
-        .map(|_| OnigMatches::new(text, OnigRegion { region }, self))
+        .map(|_| OnigMatches::new(text, region, self))
     }
 
     /// Returns all names this `Pattern` captures.
@@ -55,26 +55,11 @@ impl OnigPattern {
     }
 }
 
-#[derive(Debug)]
-pub struct OnigRegion {
-    pub(crate) region: Region,
-}
-
-impl OnigRegion {
-    pub fn pos(&self, pos: usize) -> Option<(usize, usize)> {
-        self.region.pos(pos)
-    }
-
-    pub fn len(&self) -> usize {
-        self.region.len()
-    }
-}
-
 /// The `Matches` represent matched results from a `Pattern` against a provided text.
 #[derive(Debug)]
 pub struct OnigMatches<'a> {
     text: &'a str,
-    region: crate::onig::OnigRegion,
+    region: Region,
     pattern: &'a crate::onig::OnigPattern,
 }
 
@@ -82,7 +67,7 @@ impl<'a> OnigMatches<'a> {
     /// Instantiates the matches for a pattern after the match.
     pub(crate) fn new(
         text: &'a str,
-        region: crate::onig::OnigRegion,
+        region: Region,
         pattern: &'a crate::onig::OnigPattern,
     ) -> Self {
         OnigMatches {
@@ -105,7 +90,8 @@ impl<'a> OnigMatches<'a> {
 
     /// Returns the number of matches.
     pub fn len(&self) -> usize {
-        self.region.len() - 1
+        debug_assert_eq!(self.region.len() - 1, self.pattern.names.len());
+        self.pattern.names.len()
     }
 
     /// Returns true if there are no matches, false otherwise.
@@ -137,7 +123,7 @@ impl<'a> IntoIterator for &'a OnigMatches<'a> {
 /// An `Iterator` over all matches, accessible via `Matches`.
 pub struct OnigMatchesIter<'a> {
     text: &'a str,
-    region: &'a crate::onig::OnigRegion,
+    region: &'a Region,
     names: btree_map::Iter<'a, String, u32>,
 }
 

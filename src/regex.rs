@@ -77,7 +77,7 @@ impl<'a> RegexMatches<'a> {
 
     /// Returns the number of matches.
     pub fn len(&self) -> usize {
-        self.captures.len() - 1
+        self.pattern.names.len()
     }
 
     /// Returns true if there are no matches, false otherwise.
