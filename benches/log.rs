@@ -8,7 +8,7 @@ fn main() {
 }
 
 #[divan::bench]
-fn bench_log_match(b: divan::Bencher) {
+fn r#match(b: divan::Bencher) {
     let msg = "2016-09-19T18:19:00 [8.8.8.8:prd] DEBUG this is an example log message";
 
     let mut grok = Grok::default();
@@ -23,7 +23,7 @@ fn bench_log_match(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_log_no_match(b: divan::Bencher) {
+fn no_match(b: divan::Bencher) {
     let msg = "2016-09-19T18:19:00 [8.8.8.8:prd] DEBUG this is an example log message";
 
     let mut grok = Grok::default();
@@ -38,7 +38,7 @@ fn bench_log_no_match(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_log_match_with_anchors(b: divan::Bencher) {
+fn match_anchor(b: divan::Bencher) {
     let msg = "2016-09-19T18:19:00 [8.8.8.8:prd] DEBUG this is an example log message";
 
     let mut grok = Grok::default();
@@ -53,7 +53,7 @@ fn bench_log_match_with_anchors(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_log_no_match_with_anchors(b: divan::Bencher) {
+fn no_match_anchor(b: divan::Bencher) {
     let msg = "2016-09-19T18:19:00 [8.8.8.8;prd] DEBUG this is an example log message";
 
     let mut grok = Grok::default();

@@ -8,7 +8,7 @@ fn main() {
 }
 
 #[divan::bench]
-fn bench_apache_log_match(b: divan::Bencher) {
+fn r#match(b: divan::Bencher) {
     let msg = r#"220.181.108.96 - - [13/Jun/2015:21:14:28 +0000] "GET /blog/geekery/xvfb-firefox.html HTTP/1.1" 200 10975 "-" "Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)""#;
 
     let mut grok = Grok::default();
@@ -23,7 +23,7 @@ fn bench_apache_log_match(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_apache_log_no_match_start(b: divan::Bencher) {
+fn no_match_start(b: divan::Bencher) {
     let msg = r#"tash-scale11x/css/fonts/Roboto-Regular.ttf HTTP/1.1" 200 41820 "http://semicomplete.com/presentations/logs"#;
 
     let mut grok = Grok::default();
@@ -38,7 +38,7 @@ fn bench_apache_log_no_match_start(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_apache_log_no_match_middle(b: divan::Bencher) {
+fn no_match_middle(b: divan::Bencher) {
     let msg = r#"220.181.108.96 - - [13/Jun/2015:21:14:28 +0000] "111 /blog/geekery/xvfb-firefox.html HTTP/1.1" 200 10975 "-" "Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)""#;
 
     let mut grok = Grok::default();
@@ -53,7 +53,7 @@ fn bench_apache_log_no_match_middle(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_apache_log_no_match_end(b: divan::Bencher) {
+fn no_match_end(b: divan::Bencher) {
     let msg = r#"220.181.108.96 - - [13/Jun/2015:21:14:28 +0000] "GET /blog/geekery/xvfb-firefox.html HTTP/1.1" 200 10975 "-" 1"#;
 
     let mut grok = Grok::default();
@@ -68,7 +68,7 @@ fn bench_apache_log_no_match_end(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_apache_log_match_anchor(b: divan::Bencher) {
+fn match_anchor(b: divan::Bencher) {
     let msg = r#"220.181.108.96 - - [13/Jun/2015:21:14:28 +0000] "GET /blog/geekery/xvfb-firefox.html HTTP/1.1" 200 10975 "-" "Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)""#;
 
     let mut grok = Grok::default();
@@ -83,7 +83,7 @@ fn bench_apache_log_match_anchor(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_apache_log_no_match_start_anchor(b: divan::Bencher) {
+fn no_match_start_anchor(b: divan::Bencher) {
     let msg = r#"tash-scale11x/css/fonts/Roboto-Regular.ttf HTTP/1.1" 200 41820 "http://semicomplete.com/presentations/logs"#;
 
     let mut grok = Grok::default();
@@ -98,7 +98,7 @@ fn bench_apache_log_no_match_start_anchor(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_apache_log_no_match_middle_anchor(b: divan::Bencher) {
+fn no_match_middle_anchor(b: divan::Bencher) {
     let msg = r#"220.181.108.96 - - [13/Jun/2015:21:14:28 +0000] "111 /blog/geekery/xvfb-firefox.html HTTP/1.1" 200 10975 "-" "Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)""#;
 
     let mut grok = Grok::default();
@@ -113,7 +113,7 @@ fn bench_apache_log_no_match_middle_anchor(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_apache_log_no_match_end_anchor(b: divan::Bencher) {
+fn no_match_end_anchor(b: divan::Bencher) {
     let msg = r#"220.181.108.96 - - [13/Jun/2015:21:14:28 +0000] "GET /blog/geekery/xvfb-firefox.html HTTP/1.1" 200 10975 "-" 1"#;
 
     let mut grok = Grok::default();

@@ -8,7 +8,7 @@ fn main() {
 }
 
 #[divan::bench]
-fn bench_simple_pattern_match(b: divan::Bencher) {
+fn r#match(b: divan::Bencher) {
     let mut grok = Grok::empty();
     grok.add_pattern("USERNAME", r"[a-zA-Z0-9._-]+");
     let pattern = grok
@@ -23,7 +23,7 @@ fn bench_simple_pattern_match(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_simple_pattern_no_match(b: divan::Bencher) {
+fn no_match(b: divan::Bencher) {
     let mut grok = Grok::empty();
     grok.add_pattern("USERNAME", r"[a-zA-Z0-9._-]+");
     let pattern = grok
@@ -38,7 +38,7 @@ fn bench_simple_pattern_no_match(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_simple_pattern_match_with_anchor(b: divan::Bencher) {
+fn match_anchor(b: divan::Bencher) {
     let mut grok = Grok::empty();
     grok.add_pattern("USERNAME", r"[a-zA-Z0-9._-]+");
     let pattern = grok
@@ -53,7 +53,7 @@ fn bench_simple_pattern_match_with_anchor(b: divan::Bencher) {
 }
 
 #[divan::bench]
-fn bench_simple_pattern_no_match_with_anchor(b: divan::Bencher) {
+fn no_match_anchor(b: divan::Bencher) {
     let mut grok = Grok::empty();
     grok.add_pattern("USERNAME", r"[a-zA-Z0-9._-]+");
     let pattern = grok
