@@ -1,66 +1,68 @@
-#![feature(test)]
-
-extern crate test;
+#![allow(clippy::incompatible_msrv)]
+// ^need 1.66 for `black_box`
 
 use grok::Grok;
-use test::Bencher;
 
-#[bench]
-fn bench_simple_pattern_match(b: &mut Bencher) {
+fn main() {
+    divan::main();
+}
+
+#[divan::bench]
+fn r#match(b: divan::Bencher) {
     let mut grok = Grok::empty();
     grok.add_pattern("USERNAME", r"[a-zA-Z0-9._-]+");
     let pattern = grok
         .compile("%{USERNAME}", false)
         .expect("Error while compiling!");
 
-    b.iter(|| {
+    b.bench(|| {
         if let Some(found) = pattern.match_against("user") {
-            test::black_box(&found);
+            divan::black_box(&found);
         }
     });
 }
 
-#[bench]
-fn bench_simple_pattern_no_match(b: &mut Bencher) {
+#[divan::bench]
+fn no_match(b: divan::Bencher) {
     let mut grok = Grok::empty();
     grok.add_pattern("USERNAME", r"[a-zA-Z0-9._-]+");
     let pattern = grok
         .compile("%{USERNAME}", false)
         .expect("Error while compiling!");
 
-    b.iter(|| {
+    b.bench(|| {
         if let Some(found) = pattern.match_against("$$$$") {
-            test::black_box(&found);
+            divan::black_box(&found);
         }
     });
 }
 
-#[bench]
-fn bench_simple_pattern_match_with_anchor(b: &mut Bencher) {
+#[divan::bench]
+fn match_anchor(b: divan::Bencher) {
     let mut grok = Grok::empty();
     grok.add_pattern("USERNAME", r"[a-zA-Z0-9._-]+");
     let pattern = grok
         .compile("^%{USERNAME}$", false)
         .expect("Error while compiling!");
 
-    b.iter(|| {
+    b.bench(|| {
         if let Some(found) = pattern.match_against("user") {
-            test::black_box(&found);
+            divan::black_box(&found);
         }
     });
 }
 
-#[bench]
-fn bench_simple_pattern_no_match_with_anchor(b: &mut Bencher) {
+#[divan::bench]
+fn no_match_anchor(b: divan::Bencher) {
     let mut grok = Grok::empty();
     grok.add_pattern("USERNAME", r"[a-zA-Z0-9._-]+");
     let pattern = grok
         .compile("^%{USERNAME}$", false)
         .expect("Error while compiling!");
 
-    b.iter(|| {
+    b.bench(|| {
         if let Some(found) = pattern.match_against("$$$$") {
-            test::black_box(&found);
+            divan::black_box(&found);
         }
     });
 }

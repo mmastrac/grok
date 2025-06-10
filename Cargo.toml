@@ -40,3 +40,18 @@ pcre2 = { version = "0.2.9", optional = true }
 
 [build-dependencies]
 glob = "0.3"
+
+[dev-dependencies]
+divan = "0.1.21"
+
+[[bench]]
+name = "apache"
+harness = false
+
+[[bench]]
+name = "log"
+harness = false
+
+[[bench]]
+name = "simple"
+harness = false
