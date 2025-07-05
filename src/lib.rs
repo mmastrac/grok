@@ -21,6 +21,8 @@ mod pcre2;
 #[cfg(feature = "regex")]
 mod regex;
 
+mod pattern_parser;
+
 // Enable features in the following preferred order. If multiple features are
 // enabled, the first one in the list is used.
 
@@ -29,29 +31,137 @@ mod regex;
 // 3. onig
 // 3. regex
 
+#[doc(hidden)]
 #[cfg(feature = "pcre2")]
-pub use pcre2::{
-    Pcre2Matches as Matches, Pcre2MatchesIter as MatchesIter, Pcre2Pattern as Pattern,
+use pcre2::{
+    Pcre2Matches as MatchesInner, Pcre2MatchesIter as MatchesIterInner,
+    Pcre2Pattern as InnerPattern,
 };
 
+#[doc(hidden)]
 #[cfg(all(not(feature = "pcre2"), feature = "fancy-regex"))]
-pub use fancy_regex::{
-    FancyRegexMatches as Matches, FancyRegexMatchesIter as MatchesIter,
-    FancyRegexPattern as Pattern,
+use fancy_regex::{
+    FancyRegexMatches as MatchesInner, FancyRegexMatchesIter as MatchesIterInner,
+    FancyRegexPattern as InnerPattern,
 };
 
+#[doc(hidden)]
 #[cfg(all(not(feature = "pcre2"), not(feature = "fancy-regex"), feature = "onig"))]
-pub use onig::{OnigMatches as Matches, OnigMatchesIter as MatchesIter, OnigPattern as Pattern};
+use onig::{
+    OnigMatches as MatchesInner, OnigMatchesIter as MatchesIterInner, OnigPattern as InnerPattern,
+};
 
+#[doc(hidden)]
 #[cfg(all(
     not(feature = "pcre2"),
     not(feature = "fancy-regex"),
     not(feature = "onig"),
     feature = "regex"
 ))]
-pub use regex::{
-    RegexMatches as Matches, RegexMatchesIter as MatchesIter, RegexPattern as Pattern,
+use regex::{
+    RegexMatches as MatchesInner, RegexMatchesIter as MatchesIterInner,
+    RegexPattern as InnerPattern,
 };
+
+use crate::pattern_parser::{grok_split, GrokComponent};
+
+/// The `Pattern` represents a compiled regex, ready to be matched against arbitrary text.
+pub struct Pattern {
+    inner: InnerPattern,
+    #[cfg(test)]
+    text: String,
+}
+
+impl Pattern {
+    /// Creates a new pattern from a raw regex string and an alias map to identify the
+    /// fields properly.
+    #[inline(always)]
+    fn new(regex: &str, alias: HashMap<String, String>) -> Result<Self, Error> {
+        let inner = InnerPattern::new(regex, &alias)?;
+        Ok(Self {
+            inner,
+            #[cfg(test)]
+            text: regex.to_string(),
+        })
+    }
+
+    /// Matches this compiled `Pattern` against the text and returns the matches.
+    #[inline(always)]
+    pub fn match_against<'a>(&'a self, text: &'a str) -> Option<Matches<'a>> {
+        Some(Matches {
+            inner: self.inner.match_against(text)?,
+        })
+    }
+
+    /// Returns all names this `Pattern` captures.
+    #[inline(always)]
+    pub fn capture_names(&self) -> impl Iterator<Item = &str> {
+        self.inner.capture_names()
+    }
+}
+
+/// The `Matches` represent matched results from a `Pattern` against a provided text.
+pub struct Matches<'a> {
+    inner: MatchesInner<'a>,
+}
+
+impl<'a> Matches<'a> {
+    /// Gets the value for the name (or) alias if found, `None` otherwise.
+    #[inline(always)]
+    pub fn get(&self, name: &str) -> Option<&str> {
+        self.inner.get(name)
+    }
+
+    /// Returns a tuple of key/value with all the matches found.
+    #[inline(always)]
+    pub fn iter(&'a self) -> impl Iterator<Item = (&'a str, &'a str)> {
+        self.inner.iter()
+    }
+
+    /// Collects the matches into a collection supporting `FromIterator`.
+    #[inline(always)]
+    pub fn collect<O: FromIterator<(&'a str, &'a str)>>(&'a self) -> O {
+        self.iter().collect()
+    }
+
+    /// Returns the number of matches.
+    #[cfg(test)]
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.iter().count()
+    }
+}
+
+impl<'a> std::fmt::Debug for Matches<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let iter = self.inner.into_iter();
+        f.debug_map().entries(iter).finish()
+    }
+}
+
+impl<'a> IntoIterator for &'a Matches<'a> {
+    type Item = (&'a str, &'a str);
+    type IntoIter = MatchesIter<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        MatchesIter {
+            inner: self.inner.into_iter(),
+        }
+    }
+}
+
+/// An `Iterator` over all matches, accessible via `Matches`.
+pub struct MatchesIter<'a> {
+    inner: MatchesIterInner<'a>,
+}
+
+impl<'a> Iterator for MatchesIter<'a> {
+    type Item = (&'a str, &'a str);
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
 
 #[cfg(all(
     not(feature = "onig"),
@@ -62,12 +172,6 @@ pub use regex::{
 compile_error!("No regex engine selected. Please enable one of the following features: fancy-regex, onig, regex");
 
 const MAX_RECURSION: usize = 1024;
-
-const GROK_PATTERN: &str = r"%\{(?<name>(?<pattern>[A-z0-9]+)(?::(?<alias>[A-z0-9_:;\/\s\.]+))?)(?:=(?<definition>(?:(?:[^{}]+|\.+)+)+))?\}";
-const NAME_INDEX: usize = 1;
-const PATTERN_INDEX: usize = 2;
-const ALIAS_INDEX: usize = 3;
-const DEFINITION_INDEX: usize = 4;
 
 /// Returns the default patterns, also used by the default constructor of `Grok`.
 pub fn patterns<'a>() -> &'a [(&'a str, &'a str)] {
@@ -103,98 +207,100 @@ impl Grok {
     }
 
     /// Compiles the given pattern, making it ready for matching.
+    ///
+    /// Specify `with_alias_only` to only include the aliases in the matches
+    /// rather that all named patterns.
     pub fn compile(&mut self, pattern: &str, with_alias_only: bool) -> Result<Pattern, Error> {
-        let mut named_regex = String::from(pattern);
-        let mut alias: HashMap<String, String> = HashMap::new();
+        let mut named_regex = String::with_capacity(pattern.len() * 4);
+        let mut aliases: HashMap<String, String> = HashMap::new();
+        let mut aliases_extra: HashMap<String, usize> = HashMap::new();
 
+        let mut pattern_stack = Vec::with_capacity(16);
+
+        pattern_stack.push(grok_split(pattern));
         let mut index = 0;
-        let mut iteration_left = MAX_RECURSION;
-        let mut continue_iteration = true;
+        let mut pattern_overrides = BTreeMap::new();
 
-        let grok_regex = match ::onig::Regex::new(GROK_PATTERN) {
-            Ok(r) => r,
-            Err(_) => return Err(Error::RegexCompilationFailed(GROK_PATTERN.into())),
-        };
+        while let Some(mut it) = pattern_stack.pop() {
+            if let Some(next) = it.next() {
+                pattern_stack.push(it);
+                use GrokComponent::*;
+                match next {
+                    GrokPattern {
+                        name,
+                        alias,
+                        #[expect(unused)]
+                        capture, // TODO: use
+                        definition,
+                        ..
+                    } => {
+                        if !definition.is_empty() {
+                            // We can cleverly reborrow the definition here because we know that
+                            // the lifetime is compatible.
+                            pattern_stack.push(grok_split(definition));
+                            pattern_overrides.insert(name.to_string(), definition);
+                        } else if let Some(pattern) = pattern_overrides.get(name) {
+                            // Again, cleverly reborrow the pattern
+                            pattern_stack.push(grok_split(*pattern));
+                        } else {
+                            let Some(pattern) = self.patterns.get(name) else {
+                                return Err(Error::DefinitionNotFound(name.to_string()));
+                            };
+                            pattern_stack.push(grok_split(pattern));
+                        }
 
-        while continue_iteration {
-            continue_iteration = false;
-            if iteration_left == 0 {
+                        if with_alias_only && alias.is_empty() {
+                            named_regex.push_str("(?:");
+                        } else {
+                            let match_name = format!("_n_{index}");
+                            index += 1;
+
+                            let orig_key = if alias.is_empty() { name } else { alias };
+
+                            let count = aliases_extra.entry(orig_key.to_string()).or_insert(0);
+                            let key = if *count == 0 {
+                                orig_key.to_string()
+                            } else {
+                                format!("{orig_key}[{count}]")
+                            };
+                            *count += 1;
+
+                            // This is unlikely but will really mess things up if it happens.
+                            if *count > 1 && aliases_extra.contains_key(&key) {
+                                return Err(Error::GenericCompilationFailure(format!(
+                                    "Alias {key} already exists"
+                                )));
+                            }
+
+                            aliases.insert(match_name.clone(), key);
+
+                            named_regex.push_str("(?<");
+                            named_regex.push_str(&match_name);
+                            named_regex.push('>');
+                        }
+                    }
+                    RegularExpression { string, .. } => {
+                        named_regex.push_str(string);
+                    }
+                    PatternError(e) => {
+                        return Err(Error::GenericCompilationFailure(format!("{e:?}")));
+                    }
+                }
+            } else {
+                named_regex.push(')');
+            }
+
+            if pattern_stack.len() > MAX_RECURSION {
                 return Err(Error::RecursionTooDeep);
             }
-            iteration_left -= 1;
-
-            if let Some(m) = grok_regex.captures(&named_regex.clone()) {
-                continue_iteration = true;
-                let raw_pattern = match m.at(PATTERN_INDEX) {
-                    Some(p) => p,
-                    None => {
-                        return Err(Error::GenericCompilationFailure(
-                            "Could not find pattern in matches".into(),
-                        ))
-                    }
-                };
-
-                let mut name = match m.at(NAME_INDEX) {
-                    Some(n) => String::from(n),
-                    None => {
-                        return Err(Error::GenericCompilationFailure(
-                            "Could not find name in matches".into(),
-                        ))
-                    }
-                };
-
-                if let Some(definition) = m.at(DEFINITION_INDEX) {
-                    self.add_pattern(raw_pattern, definition);
-                    name = format!("{}={}", name, definition);
-                }
-
-                // Since a pattern with a given name can show up more than once, we need to
-                // loop through the number of matches found and apply the transformations
-                // on each of them.
-                for _ in 0..named_regex.matches(&format!("%{{{}}}", name)).count() {
-                    // Check if we have a definition for the raw pattern key and fail quickly
-                    // if not.
-                    let pattern_definition = match self.patterns.get(raw_pattern) {
-                        Some(d) => d,
-                        None => return Err(Error::DefinitionNotFound(raw_pattern.into())),
-                    };
-
-                    // If no alias is specified and all but with alias are ignored,
-                    // the replacement tells the regex engine to ignore the matches.
-                    // Otherwise, the definition is turned into a regex that the
-                    // engine understands and uses a named group.
-
-                    let replacement = if with_alias_only && m.at(ALIAS_INDEX).is_none() {
-                        format!("(?:{})", pattern_definition)
-                    } else {
-                        // If an alias is specified by the user use that one to
-                        // match the name<index> conversion, otherwise just use
-                        // the name of the pattern definition directly.
-                        alias.insert(
-                            match m.at(ALIAS_INDEX) {
-                                Some(a) => a.into(),
-                                None => name.clone(),
-                            },
-                            format!("name{}", index),
-                        );
-
-                        format!("(?<name{}>{})", index, pattern_definition)
-                    };
-
-                    // Finally, look for the original %{...} style pattern and
-                    // replace it with our replacement (only the first occurrence
-                    // since we are iterating one by one).
-                    named_regex = named_regex.replacen(&format!("%{{{}}}", name), &replacement, 1);
-
-                    index += 1;
-                }
-            }
         }
+
+        named_regex.pop();
 
         if named_regex.is_empty() {
             Err(Error::CompiledPatternIsEmpty(pattern.into()))
         } else {
-            Pattern::new(&named_regex, &alias)
+            Pattern::new(&named_regex, aliases)
         }
     }
 }
@@ -395,7 +501,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ailas_named_pattern() {
+    fn test_alias_named_pattern() {
         let mut grok = Grok::empty();
         grok.add_pattern("USERNAME", r"[a-zA-Z0-9._-]+");
         grok.add_pattern("USER", r"%{USERNAME}");
@@ -426,7 +532,7 @@ mod tests {
             .match_against("5E:FF:56:A2:AF:15")
             .expect("No matches found!");
         assert_eq!("5E:FF:56:A2:AF:15", matches.get("MAC").unwrap());
-        assert_eq!(4, matches.len());
+        assert_eq!(2, matches.len());
         let matches = pattern
             .match_against("hello! 5E:FF:56:A2:AF:15 what?")
             .expect("No matches found!");
@@ -497,7 +603,7 @@ mod tests {
             )
             .expect("Error while compiling!");
         let matches = pattern
-            .match_against("Monday March 2012")
+            .match_against("Monday March 2012 user")
             .expect("No matches found!");
         assert_eq!(matches.len(), 4);
         let mut found = 0;
@@ -506,11 +612,12 @@ mod tests {
                 "day" => assert_eq!("Monday", v),
                 "month" => assert_eq!("March", v),
                 "year" => assert_eq!("2012", v),
+                "user" => assert_eq!("user", v),
                 e => panic!("{:?}", e),
             }
             found += 1;
         }
-        assert_eq!(3, found);
+        assert_eq!(4, found);
     }
 
     #[test]
@@ -529,7 +636,7 @@ mod tests {
             )
             .expect("Error while compiling!");
         let matches = pattern
-            .match_against("Monday March 2012")
+            .match_against("Monday March 2012 username")
             .expect("No matches found!");
         assert_eq!(matches.len(), 4);
         let mut found = 0;
@@ -538,13 +645,15 @@ mod tests {
                 "day" => assert_eq!("Monday", v),
                 "month" => assert_eq!("March", v),
                 "year" => assert_eq!("2012", v),
+                "user" => assert_eq!("username", v),
                 e => panic!("{:?}", e),
             }
             found += 1;
         }
-        assert_eq!(3, found);
+        assert_eq!(4, found);
     }
 
+    #[cfg(not(feature = "regex"))]
     #[test]
     fn test_loaded_default_patterns() {
         let mut grok = Grok::with_default_patterns();
@@ -561,6 +670,7 @@ mod tests {
         assert_eq!(None, matches.get("unknown"));
     }
 
+    #[cfg(not(feature = "regex"))]
     #[test]
     fn test_compilation_of_all_default_patterns() {
         let mut grok = Grok::default();
@@ -617,6 +727,37 @@ mod tests {
         assert_eq!(1, found);
     }
 
+    /// If multiple captures have the same name, the last one wins.
+    #[test]
+    fn test_adhoc_pattern_conflict() {
+        let mut grok = Grok::with_default_patterns();
+        let pattern = grok
+            .compile(r"(?<capture>\w+) %{GREEDYDATA:capture}", true)
+            .unwrap();
+        assert_eq!(vec!["capture"], Vec::from_iter(pattern.capture_names()));
+        let matches = pattern.match_against("word1 word2").unwrap();
+        assert_eq!("word2", matches.get("capture").unwrap());
+    }
+
+    #[test]
+    fn test_capture_repeat() {
+        let mut grok = Grok::with_default_patterns();
+        let pattern = grok.compile(r"%{INT}{1,3}", false).unwrap();
+        let matches = pattern.match_against("+1+2+3").unwrap();
+        assert_eq!("+3", matches.get("INT").unwrap());
+    }
+
+    #[test]
+    fn test_pattern_with_definition() {
+        let mut grok = Grok::default();
+        let pattern = grok
+            .compile(r"%{NEW_PATTERN:first=\w+} %{NEW_PATTERN:second}", false)
+            .unwrap();
+        let matches = pattern.match_against("word1 word2").unwrap();
+        assert_eq!("word1", matches.get("first").unwrap());
+        assert_eq!("word2", matches.get("second").unwrap());
+    }
+
     #[test]
     fn test_capture_names() {
         let mut grok = Grok::empty();
@@ -635,6 +776,7 @@ mod tests {
         assert_eq!(expected, actual);
     }
 
+    #[cfg(not(feature = "regex"))]
     #[test]
     fn test_capture_error() {
         let mut grok = Grok::with_default_patterns();
@@ -645,5 +787,79 @@ mod tests {
             .match_against("Path: /AAAAA/BBBBB/CCCCC/DDDDDDDDDDDDDD EEEEEEEEEEEEEEEEEEEEEEEE/");
 
         assert!(matches.is_none());
+    }
+
+    #[cfg(not(feature = "regex"))]
+    #[test]
+    fn test_match_deep_patterns() {
+        let mut grok = Grok::with_default_patterns();
+        let pattern = grok
+            .compile("%{BACULA_LOGLINE}", false)
+            .expect("Error while compiling!");
+
+        let capture_names = pattern.capture_names().collect::<Vec<_>>();
+        assert_eq!(163, capture_names.len());
+        eprintln!("{capture_names:?}");
+        assert!(
+            !capture_names.iter().any(|s| s.starts_with("name")),
+            "Found a name<n> in {capture_names:?}"
+        );
+
+        // %{BACULA_TIMESTAMP:bts} %{BACULA_HOST:hostname} JobId %{INT:jobid}: (%{BACULA_LOG_BEGIN_PRUNE_FILES})
+
+        let log_line = "03-Jan 11:22 HostName JobId 1234: Begin pruning Files.";
+        let matches = pattern.match_against(log_line).unwrap();
+        assert_eq!("03-Jan 11:22", matches.get("bts").unwrap());
+        assert_eq!("HostName", matches.get("hostname").unwrap());
+        assert_eq!("1234", matches.get("jobid").unwrap());
+
+        assert_eq!(
+            "Begin pruning Files.",
+            matches.get("BACULA_LOG_BEGIN_PRUNE_FILES").unwrap()
+        );
+        assert_eq!(
+            "03-Jan 11:22 HostName JobId 1234: Begin pruning Files.",
+            matches.get("BACULA_LOGLINE").unwrap()
+        );
+        assert_eq!("03", matches.get("MONTHDAY").unwrap());
+        assert_eq!("Jan", matches.get("MONTH").unwrap());
+
+        assert_eq!(None, matches.get("BACULA_LOG_END_VOLUME"));
+        assert_eq!(None, matches.get("doesn't exist"));
+
+        let matches = HashMap::<&str, &str>::from_iter(matches.iter());
+        assert_eq!(9, matches.len());
+
+        // BACULA_LOG_END_VOLUME End of medium on Volume \"%{BACULA_VOLUME:volume}\" Bytes=%{BACULA_CAPACITY} Blocks=%{BACULA_CAPACITY} at %{MONTHDAY}-%{MONTH}-%{YEAR} %{HOUR}:%{MINUTE}.
+
+        let log_line = "03-Feb 11:22 HostName JobId 1234: End of medium on Volume \"Volume1\" Bytes=1000000000 Blocks=1000000 at 01-Mar-2026 01:02.";
+        let matches = pattern.match_against(log_line).unwrap();
+        eprintln!("{:?}", matches);
+    }
+
+    #[cfg(not(feature = "regex"))]
+    #[test]
+    fn test_compile_deep_patterns() {
+        let mut grok = Grok::with_default_patterns();
+        let pattern = grok
+            .compile("%{BACULA_LOGLINE}", false)
+            .expect("Error while compiling!");
+
+        assert_eq!(pattern.text, include_str!("../testdata/BACULA_LOGLINE"));
+
+        let pattern = grok
+            .compile("%{BACULA_LOGLINE}", true)
+            .expect("Error while compiling!");
+
+        assert_eq!(
+            pattern.text,
+            include_str!("../testdata/BACULA_LOGLINE.aliasesonly")
+        );
+
+        let pattern = grok
+            .compile("%{ELB_ACCESS_LOG}", false)
+            .expect("Error while compiling!");
+
+        assert_eq!(pattern.text, include_str!("../testdata/ELB_ACCESS_LOG"));
     }
 }

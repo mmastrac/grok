@@ -4,9 +4,9 @@ use std::collections::{btree_map, BTreeMap, HashMap};
 
 /// The `Pattern` represents a compiled regex, ready to be matched against arbitrary text.
 #[derive(Debug)]
-pub struct FancyRegexPattern {
+pub(crate) struct FancyRegexPattern {
     regex: Regex,
-    names: BTreeMap<String, usize>,
+    pub names: BTreeMap<String, usize>,
 }
 
 impl FancyRegexPattern {
@@ -18,10 +18,7 @@ impl FancyRegexPattern {
                 let mut names = BTreeMap::new();
                 for (i, name) in r.capture_names().enumerate() {
                     if let Some(name) = name {
-                        let name = match alias.iter().find(|&(_k, v)| *v == name) {
-                            Some(item) => item.0.clone(),
-                            None => String::from(name),
-                        };
+                        let name = alias.get(name).map_or(name, |s| s).to_string();
                         names.insert(name, i);
                     }
                 }
@@ -51,9 +48,9 @@ impl FancyRegexPattern {
 
 /// The `Matches` represent matched results from a `Pattern` against a provided text.
 #[derive(Debug)]
-pub struct FancyRegexMatches<'a> {
+pub(crate) struct FancyRegexMatches<'a> {
     captures: Captures<'a>,
-    pattern: &'a FancyRegexPattern,
+    pub pattern: &'a FancyRegexPattern,
 }
 
 impl<'a> FancyRegexMatches<'a> {
@@ -66,19 +63,7 @@ impl<'a> FancyRegexMatches<'a> {
             .map(|m| m.as_str())
     }
 
-    /// Returns the number of matches.
-    pub fn len(&self) -> usize {
-        self.pattern.names.len()
-    }
-
-    /// Returns true if there are no matches, false otherwise.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     /// Returns a tuple of key/value with all the matches found.
-    ///
-    /// Note that if no match is found, the value is empty.
     pub fn iter(&'a self) -> FancyRegexMatchesIter<'a> {
         FancyRegexMatchesIter {
             captures: &self.captures,
@@ -97,7 +82,7 @@ impl<'a> IntoIterator for &'a FancyRegexMatches<'a> {
 }
 
 /// An `Iterator` over all matches, accessible via `Matches`.
-pub struct FancyRegexMatchesIter<'a> {
+pub(crate) struct FancyRegexMatchesIter<'a> {
     captures: &'a Captures<'a>,
     names: btree_map::Iter<'a, String, usize>,
 }

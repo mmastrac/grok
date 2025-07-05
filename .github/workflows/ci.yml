@@ -2,6 +2,8 @@ name: Continuous Integration
 
 on:
   pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
@@ -29,13 +31,26 @@ jobs:
         with:
           toolchain: stable
       - uses: actions-rs/cargo@v1
+        name: Test with default features
         with:
           command: test
       - uses: actions-rs/cargo@v1
+        name: Test with fancy-regex feature
         with:
           command: test
           args: --no-default-features --features fancy-regex
       - uses: actions-rs/cargo@v1
+        name: Test with pcre2 feature
         with:
           command: test
           args: --no-default-features --features pcre2
+      - uses: actions-rs/cargo@v1
+        name: Test with onig feature
+        with:
+          command: test
+          args: --no-default-features --features onig
+      - uses: actions-rs/cargo@v1
+        name: Test with regex feature
+        with:
+          command: test
+          args: --no-default-features --features regex
