@@ -11,7 +11,7 @@ fn main() {
 fn r#match(b: divan::Bencher) {
     let msg = "2016-09-19T18:19:00 [8.8.8.8:prd] DEBUG this is an example log message";
 
-    let mut grok = Grok::default();
+    let grok = Grok::default();
     let pattern = grok.compile(r"%{TIMESTAMP_ISO8601:timestamp} \[%{IPV4:ip}:%{WORD:environment}\] %{LOGLEVEL:log_level} %{GREEDYDATA:message}", false)
         .expect("Error while compiling!");
 
@@ -26,7 +26,7 @@ fn r#match(b: divan::Bencher) {
 fn no_match(b: divan::Bencher) {
     let msg = "2016-09-19T18:19:00 [8.8.8.8:prd] DEBUG this is an example log message";
 
-    let mut grok = Grok::default();
+    let grok = Grok::default();
     let pattern = grok.compile(r"%{TIMESTAMP_ISO8601:timestamp} \[%{IPV4:ip};%{WORD:environment}\] %{LOGLEVEL:log_level} %{GREEDYDATA:message}", false)
         .expect("Error while compiling!");
 
@@ -41,7 +41,7 @@ fn no_match(b: divan::Bencher) {
 fn match_anchor(b: divan::Bencher) {
     let msg = "2016-09-19T18:19:00 [8.8.8.8:prd] DEBUG this is an example log message";
 
-    let mut grok = Grok::default();
+    let grok = Grok::default();
     let pattern = grok.compile(r"^%{TIMESTAMP_ISO8601:timestamp} \[%{IPV4:ip}:%{WORD:environment}\] %{LOGLEVEL:log_level} %{GREEDYDATA:message}$", false)
         .expect("Error while compiling!");
 
@@ -56,7 +56,7 @@ fn match_anchor(b: divan::Bencher) {
 fn no_match_anchor(b: divan::Bencher) {
     let msg = "2016-09-19T18:19:00 [8.8.8.8;prd] DEBUG this is an example log message";
 
-    let mut grok = Grok::default();
+    let grok = Grok::default();
     let pattern = grok.compile(r"^%{TIMESTAMP_ISO8601:timestamp} \[%{IPV4:ip}:%{WORD:environment}\] %{LOGLEVEL:log_level} %{GREEDYDATA:message}$", false)
         .expect("Error while compiling!");
 

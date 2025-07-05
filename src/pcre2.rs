@@ -2,10 +2,12 @@ use crate::Error;
 use pcre2::bytes::{Captures, Regex, RegexBuilder};
 use std::collections::{btree_map, BTreeMap, HashMap};
 
+pub(crate) const ENGINE: crate::Engine = crate::Engine::Pcre2;
+
 /// The `Pattern` represents a compiled regex, ready to be matched against arbitrary text.
 #[derive(Debug)]
 pub(crate) struct Pcre2Pattern {
-    regex: Regex,
+    pub regex: Regex,
     pub names: BTreeMap<String, usize>,
 }
 

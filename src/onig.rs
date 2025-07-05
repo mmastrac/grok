@@ -2,10 +2,12 @@ use crate::Error;
 use onig::{MatchParam, Regex, Region, SearchOptions};
 use std::collections::{btree_map, BTreeMap, HashMap};
 
+pub(crate) const ENGINE: crate::Engine = crate::Engine::Onig;
+
 /// The `Pattern` represents a compiled regex, ready to be matched against arbitrary text.
 #[derive(Debug)]
 pub(crate) struct OnigPattern {
-    regex: Regex,
+    pub regex: Regex,
     pub names: BTreeMap<String, u32>,
 }
 
@@ -48,11 +50,7 @@ impl OnigPattern {
         let match_param = MatchParam::default();
         let result = this.search_with_param(text, 0, to, options, Some(&mut region), match_param);
 
-        match result {
-            Ok(r) => r,
-            Err(_) => None,
-        }
-        .map(|_| OnigMatches {
+        result.unwrap_or_default().map(|_| OnigMatches {
             text,
             region,
             pattern: self,
@@ -80,7 +78,7 @@ impl<'a> OnigMatches<'a> {
             Some(found) => self
                 .region
                 .pos(*found as usize)
-                .and_then(|(start, end)| Some(&self.text[start..end])),
+                .map(|(start, end)| &self.text[start..end]),
             None => None,
         }
     }
@@ -90,7 +88,7 @@ impl<'a> OnigMatches<'a> {
     /// Note that if no match is found, the value is empty.
     pub fn iter(&'a self) -> OnigMatchesIter<'a> {
         OnigMatchesIter {
-            text: &self.text,
+            text: self.text,
             region: &self.region,
             names: self.pattern.names.iter(),
         }

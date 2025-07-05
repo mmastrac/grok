@@ -4,6 +4,23 @@ All user visible changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/), as described
 for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/text/1105-api-evolution.md)
 
+## 2.3.0 - 2025-07-05
+
+ * Add support for `extract` in pattern definitions, allowing the `extract` in
+   `%{name:alias:extract}` to be retrieved from the pattern.
+ * Add `Pattern::pattern()` to `Matches` to get the pattern that was used to
+   match this `Matches` instance.
+ * Reduced the scope of inline pattern definitions to the current pattern only
+   (before 2.2.0 they were added globally, in 2.2.0 they were available to all
+   nested patterns, and in 2.3.0 they are only available to the current
+   pattern).
+ * `Grok::compile()` is now `&self` instead of `&mut self`.
+ * `Grok::with_default_patterns()` now uses `Cow` for the built-in patterns and
+   allocates significantly less per `Grok` instance (as well as being much
+   faster).
+ * Built-in patterns are available individually for reference in the new
+   `patterns` module.
+
 ## 2.2.0 - 2025-07-04
 
  * Rewrote the pattern parsing to avoid using regular expressions, making all
@@ -18,6 +35,8 @@ for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/
  * (breaking) `Matches::len()` was removed as it was previously reporting the
    pattern name count. Use `Matches::iter().count()` instead.
  * (breaking) `Matches::is_empty()` was removed. Use `Matches::iter().count() == 0` instead.
+ * (breaking) Inline pattern definitions are no longer added to the global
+   pattern list.
 
 ## 2.1.0 - 2025-05-29
 
