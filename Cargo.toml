@@ -1,6 +1,6 @@
 [package]
 name = "grok"
-version = "2.1.0"
+version = "2.2.0"
 authors = ["Matt Mastracci <matthew@mastracci.com>", "Michael Nitschinger <michael@nitschinger.at>"]
 license = "Apache-2.0"
 readme = "README.md"
@@ -20,14 +20,14 @@ rust-version = "1.56"
 [features]
 default = ["onig"]
 
-onig = []
+onig = ["dep:onig"]
 regex = ["dep:regex"]
 fancy-regex = ["dep:fancy-regex"]
 pcre2 = ["dep:pcre2"]
 
 [dependencies]
 # The default regex engine. Use default-feature = false to disable it.
-onig = { version = "6.5", default-features = false }
+onig = { version = "6.5", optional = true, default-features = false }
 
 # The Rust regex library. Does not support backtracking, so many patterns are unusable.
 regex = { version = "1", optional = true, default-features = false, features = ["std", "unicode", "perf", "perf-dfa-full"] }

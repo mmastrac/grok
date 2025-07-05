@@ -4,9 +4,9 @@ use std::collections::{btree_map, BTreeMap, HashMap};
 
 /// The `Pattern` represents a compiled regex, ready to be matched against arbitrary text.
 #[derive(Debug)]
-pub struct OnigPattern {
+pub(crate) struct OnigPattern {
     regex: Regex,
-    pub(crate) names: BTreeMap<String, u32>,
+    pub names: BTreeMap<String, u32>,
 }
 
 impl OnigPattern {
@@ -17,11 +17,17 @@ impl OnigPattern {
             Ok(r) => Ok({
                 let mut names = BTreeMap::new();
                 r.foreach_name(|cap_name, cap_idx| {
-                    let name = match alias.iter().find(|&(_k, v)| *v == cap_name) {
-                        Some(item) => item.0.clone(),
-                        None => String::from(cap_name),
-                    };
-                    names.insert(name, cap_idx[0]);
+                    let name = alias.get(cap_name).map_or(cap_name, |s| s).to_string();
+                    match names.entry(name) {
+                        btree_map::Entry::Vacant(e) => {
+                            e.insert(cap_idx[0]);
+                        }
+                        btree_map::Entry::Occupied(mut e) => {
+                            if cap_idx[0] > *e.get() {
+                                e.insert(cap_idx[0]);
+                            }
+                        }
+                    }
                     true
                 });
                 Self { regex: r, names }
@@ -61,10 +67,10 @@ impl OnigPattern {
 
 /// The `Matches` represent matched results from a `Pattern` against a provided text.
 #[derive(Debug)]
-pub struct OnigMatches<'a> {
+pub(crate) struct OnigMatches<'a> {
     text: &'a str,
     region: Region,
-    pattern: &'a crate::onig::OnigPattern,
+    pub pattern: &'a crate::onig::OnigPattern,
 }
 
 impl<'a> OnigMatches<'a> {
@@ -77,17 +83,6 @@ impl<'a> OnigMatches<'a> {
                 .and_then(|(start, end)| Some(&self.text[start..end])),
             None => None,
         }
-    }
-
-    /// Returns the number of matches.
-    pub fn len(&self) -> usize {
-        debug_assert_eq!(self.region.len() - 1, self.pattern.names.len());
-        self.pattern.names.len()
-    }
-
-    /// Returns true if there are no matches, false otherwise.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 
     /// Returns a tuple of key/value with all the matches found.
@@ -112,7 +107,7 @@ impl<'a> IntoIterator for &'a OnigMatches<'a> {
 }
 
 /// An `Iterator` over all matches, accessible via `Matches`.
-pub struct OnigMatchesIter<'a> {
+pub(crate) struct OnigMatchesIter<'a> {
     text: &'a str,
     region: &'a Region,
     names: btree_map::Iter<'a, String, u32>,

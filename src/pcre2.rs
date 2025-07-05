@@ -4,9 +4,9 @@ use std::collections::{btree_map, BTreeMap, HashMap};
 
 /// The `Pattern` represents a compiled regex, ready to be matched against arbitrary text.
 #[derive(Debug)]
-pub struct Pcre2Pattern {
+pub(crate) struct Pcre2Pattern {
     regex: Regex,
-    names: BTreeMap<String, usize>,
+    pub names: BTreeMap<String, usize>,
 }
 
 impl Pcre2Pattern {
@@ -21,10 +21,7 @@ impl Pcre2Pattern {
                 let mut names = BTreeMap::new();
                 for (i, name) in r.capture_names().iter().enumerate() {
                     if let Some(name) = name {
-                        let name = match alias.iter().find(|&(_k, v)| v == name) {
-                            Some(item) => item.0.clone(),
-                            None => String::from(name),
-                        };
+                        let name = alias.get(name).map_or(name, |s| s).to_string();
                         names.insert(name, i);
                     }
                 }
@@ -56,9 +53,9 @@ impl Pcre2Pattern {
 
 /// The `Matches` represent matched results from a `Pattern` against a provided text.
 #[derive(Debug)]
-pub struct Pcre2Matches<'a> {
+pub(crate) struct Pcre2Matches<'a> {
     captures: Captures<'a>,
-    pattern: &'a Pcre2Pattern,
+    pub pattern: &'a Pcre2Pattern,
 }
 
 impl<'a> Pcre2Matches<'a> {
@@ -69,16 +66,6 @@ impl<'a> Pcre2Matches<'a> {
             .get(name_or_alias)
             .and_then(|&idx| self.captures.get(idx))
             .map(|m| std::str::from_utf8(m.as_bytes()).unwrap())
-    }
-
-    /// Returns the number of matches.
-    pub fn len(&self) -> usize {
-        self.pattern.names.len()
-    }
-
-    /// Returns true if there are no matches, false otherwise.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 
     /// Returns a tuple of key/value with all the matches found.
@@ -102,7 +89,7 @@ impl<'a> IntoIterator for &'a Pcre2Matches<'a> {
 }
 
 /// An `Iterator` over all matches, accessible via `Matches`.
-pub struct Pcre2MatchesIter<'a> {
+pub(crate) struct Pcre2MatchesIter<'a> {
     captures: &'a Captures<'a>,
     names: btree_map::Iter<'a, String, usize>,
 }

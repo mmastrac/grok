@@ -4,6 +4,33 @@ All user visible changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/), as described
 for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/text/1105-api-evolution.md)
 
+## 2.2.0 - 2025-07-04
+
+ * Rewrote the pattern parsing to avoid using regular expressions, making all
+   regular expression engine features optional (though at least one is still
+   required).
+ * Ensure correctness in capture names, even when using duplicate names
+   generated from pattern names. These were previously unspecified:
+   * (breaking) Duplicate pattern names result in matches with incrementing names in the format:
+     `NAME`, `NAME[1]`, `NAME[2]`, etc.
+   * (breaking) Duplicate pattern names from aliases are now guaranteed to be
+     "last one wins".
+ * (breaking) `Matches::len()` was removed as it was previously reporting the
+   pattern name count. Use `Matches::iter().count()` instead.
+ * (breaking) `Matches::is_empty()` was removed. Use `Matches::iter().count() == 0` instead.
+
+## 2.1.0 - 2025-05-29
+
+ * Add support for `pcre2` feature which is significantly faster than `onig`.
+ * Add support for `regex` and `fancy_regex` features which allow for pure Rust
+   operation.
+ * Some default patterns were updated from upstream sources for better
+   compatibility across engines.
+
+## 2.0.2 - 2025-05-29
+
+ * Workaround for an issue with `onig` where certain patterns could panic.
+
 ## 2.0.1 - Unreleased
 
  * Updated `onig` to `6.4`.
