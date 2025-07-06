@@ -1,6 +1,6 @@
 [package]
 name = "grok"
-version = "2.2.0"
+version = "2.3.0"
 authors = ["Matt Mastracci <matthew@mastracci.com>", "Michael Nitschinger <michael@nitschinger.at>"]
 license = "Apache-2.0"
 readme = "README.md"
@@ -54,4 +54,8 @@ harness = false
 
 [[bench]]
 name = "simple"
+harness = false
+
+[[bench]]
+name = "pattern"
 harness = false

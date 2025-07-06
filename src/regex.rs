@@ -2,10 +2,12 @@ use crate::Error;
 use regex::{Captures, Regex};
 use std::collections::{btree_map, BTreeMap, HashMap};
 
+pub(crate) const ENGINE: crate::Engine = crate::Engine::Regex;
+
 /// The `Pattern` represents a compiled regex, ready to be matched against arbitrary text.
 #[derive(Debug)]
 pub(crate) struct RegexPattern {
-    regex: Regex,
+    pub regex: Regex,
     pub names: BTreeMap<String, usize>,
 }
 

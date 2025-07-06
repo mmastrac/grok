@@ -1,28 +1,39 @@
 use std::{iter::Peekable, ops::Range, str::CharIndices};
 
+/// An error in the grok pattern.
 #[derive(Debug)]
 pub enum GrokPatternError {
     /// The pattern could not be parsed successfully.
-    InvalidCharacter(#[allow(unused)] char),
+    InvalidCharacter(char),
     /// The pattern is invalid.
     InvalidPattern,
     /// The pattern definition is invalid.
     InvalidPatternDefinition,
 }
 
+/// One of the components of a grok pattern: a regular expression, a pattern or
+/// an error.
 pub enum GrokComponent<'a> {
     /// This chunk is a regular expression.
     RegularExpression {
+        /// The span of the original string.
         range: Range<usize>,
+        /// The text chunk of the original string.
         string: &'a str,
     },
     /// This chunk is a grok pattern placeholder.
     GrokPattern {
+        /// The span of the original string.
         range: Range<usize>,
+        /// The text chunk of the original string.
         pattern: &'a str,
+        /// The name part of the pattern.
         name: &'a str,
+        /// The alias part of the pattern.
         alias: &'a str,
-        capture: &'a str,
+        /// The extract part of the pattern.
+        extract: &'a str,
+        /// The definition part of the pattern.
         definition: &'a str,
     },
     /// The pattern could not be parsed successfully.
@@ -33,7 +44,7 @@ impl std::fmt::Debug for GrokComponent<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             GrokComponent::RegularExpression{ string, .. } => write!(f, "{string:?}"),
-            GrokComponent::GrokPattern{ name, alias, capture, definition, .. } => write!(f, "%{{ name={name:?} alias={alias:?} capture={capture:?} definition={definition:?} }}"),
+            GrokComponent::GrokPattern{ name, alias, extract: capture, definition, .. } => write!(f, "%{{ name={name:?} alias={alias:?} capture={capture:?} definition={definition:?} }}"),
             GrokComponent::PatternError(e) => write!(f, "<error {e:?}>"),
         }
     }
@@ -92,7 +103,7 @@ impl<'a> GrokSplit<'a> {
                 // Load up to three components for PATTERN:field:type, erroring out if
                 // more are present.
                 loop {
-                    match self.try_munch_word() {
+                    match self.try_munch_word(comp_index > 0) {
                         Ok((terminator, word)) => {
                             if comp_index == 3 {
                                 return Some(GrokComponent::PatternError(
@@ -104,14 +115,27 @@ impl<'a> GrokSplit<'a> {
                             let next = self.string_iter.next().unwrap();
                             comp_index += 1;
 
+                            if comp_index == 3 && components[2].is_empty() {
+                                return Some(GrokComponent::PatternError(
+                                    GrokPatternError::InvalidPatternDefinition,
+                                ));
+                            }
+
                             if terminator == '}' {
                                 let index = next.0 + 1;
+
+                                if comp_index == 2 && components[1].is_empty() {
+                                    return Some(GrokComponent::PatternError(
+                                        GrokPatternError::InvalidPatternDefinition,
+                                    ));
+                                }
+
                                 return Some(GrokComponent::GrokPattern {
                                     range: start..index,
                                     pattern: &self.string[start..index],
                                     name: components[0],
                                     alias: components[1],
-                                    capture: components[2],
+                                    extract: components[2],
                                     definition: "",
                                 });
                             } else if terminator == '=' {
@@ -138,13 +162,18 @@ impl<'a> GrokSplit<'a> {
                                         GrokPatternError::InvalidPatternDefinition,
                                     ));
                                 }
+                                if comp_index == 2 && components[1].is_empty() {
+                                    return Some(GrokComponent::PatternError(
+                                        GrokPatternError::InvalidPatternDefinition,
+                                    ));
+                                }
 
                                 return Some(GrokComponent::GrokPattern {
                                     range: start..index,
                                     pattern: &self.string[start..index + 1],
                                     name: components[0],
                                     alias: components[1],
-                                    capture: components[2],
+                                    extract: components[2],
                                     definition,
                                 });
                             }
@@ -176,7 +205,10 @@ impl<'a> GrokSplit<'a> {
 
     /// Attempt to munch a word at the current index, Returns the terminator
     /// character and the word.
-    fn try_munch_word(&mut self) -> Result<(char, &'a str), GrokPatternError> {
+    fn try_munch_word(
+        &mut self,
+        is_alias_or_capture: bool,
+    ) -> Result<(char, &'a str), GrokPatternError> {
         let terminator;
 
         let Some((start, _)) = self.string_iter.peek() else {
@@ -192,7 +224,11 @@ impl<'a> GrokSplit<'a> {
                     terminator = *next;
                     break;
                 }
-                if !next.is_ascii_alphanumeric() && !"_-[]".contains(*next) {
+                // is_alias or is_capture allows for extra chars: `-[].`
+                if !next.is_ascii_alphanumeric()
+                    && *next != '_'
+                    && (!is_alias_or_capture || !"-[].".contains(*next))
+                {
                     return Err(GrokPatternError::InvalidCharacter(*next));
                 }
                 _ = self.string_iter.next();
@@ -201,7 +237,7 @@ impl<'a> GrokSplit<'a> {
             }
         }
 
-        if end == start {
+        if end == start && !is_alias_or_capture {
             Err(GrokPatternError::InvalidPattern)
         } else {
             Ok((terminator, &self.string[start..end]))
@@ -209,6 +245,30 @@ impl<'a> GrokSplit<'a> {
     }
 }
 
+/// Splits a grok pattern into its components.
+///
+/// A grok pattern is a regular expression string with grok pattern placeholders
+/// embedded in it.
+///
+/// The grok pattern placeholders are of the form
+/// `%{name:alias:extract=definition}`, where `name` is the name of the pattern,
+/// `alias` is the alias of the pattern, `extract` is the extract of the
+/// pattern, and `definition` is the definition of the pattern.
+///
+/// - `name` is the name of the pattern and is required. It may contain any
+///   alphanumeric character, or `_`.
+/// - `alias` is the alias of the pattern and is optional. It may contain any
+///   alphanumeric character, or any of `_-[].`. If extract is provided,
+///   `alias` may be empty.
+/// - `extract` is the extract of the pattern and is optional. It may contain
+///   any alphanumeric character, or any of `_-[].`.
+/// - `definition` is the definition of the pattern and is optional. It may
+///   contain any character other than `{` or `}`.
+///
+/// A literal `%` character may appear in a grok pattern as long as it is not
+/// followed by `{`. You can surround the percent with grouped parentheses
+/// `(%){..}`, a non-capturing group `(?:%){..}`, or use the `\x25` escape
+/// sequence, ie: `\x25{..}`.
 pub fn grok_split<'a, S: AsRef<str> + ?Sized>(string: &'a S) -> GrokSplit<'a> {
     let string = string.as_ref();
     GrokSplit {
@@ -238,14 +298,19 @@ mod tests {
             "%{name}",
             "%{name:name}",
             "%{name:name:name}",
+            "%{name::name}",
             "%{name=defn}",
             "%{name:name=defn}",
             "%{name:name:name=defn}",
+            "%{name:name[x]}",
+            "%{name:name[x]:name[y]}",
         ] {
             eprintln!("{pattern} -> {:?}", grok_split(pattern).collect::<Vec<_>>());
             assert!(!grok_split(pattern).any(|c| matches!(c, GrokComponent::PatternError(_))));
             let result = grok_split(pattern).next().unwrap();
             eprintln!("{result:?}");
+
+            // TODO: test parse results
         }
     }
 
@@ -259,6 +324,8 @@ mod tests {
             assert!(!grok_split(pattern).any(|c| matches!(c, GrokComponent::PatternError(_))));
             let result = grok_split(pattern).next().unwrap();
             eprintln!("{result:?}");
+
+            // TODO: test parse results
         }
     }
 
@@ -270,14 +337,14 @@ mod tests {
             "%{name=}",
             "%{name=a",
             "%{name:",
-            "%{name:}",
+            "%{name:}", // capture must be provided if alias is empty
             "%{name:a",
             "%{name:a:b",
             "%{name::",
             "%{name::b",
-            "%{name::b}",
             "%{name:a:}",
             "%{name::}",
+            "%{na.me:a:b}",
             "%{name:a:b:c}",
             "%{name:a:b:c:d}",
         ] {
