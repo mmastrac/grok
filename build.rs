@@ -81,7 +81,7 @@ fn main() {
             .first()
             .unwrap()
             .2
-            .display()
+            .to_string_lossy()
             .to_string()
             .replace('-', "_");
         fmt::write(&mut output, format_args!("\npub mod {name} {{\n")).unwrap();
