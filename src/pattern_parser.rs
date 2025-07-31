@@ -169,7 +169,7 @@ impl<'a> GrokSplit<'a> {
                                 }
 
                                 return Some(GrokComponent::GrokPattern {
-                                    range: start..index,
+                                    range: start..index + 1,
                                     pattern: &self.string[start..index + 1],
                                     name: components[0],
                                     alias: components[1],
@@ -309,6 +309,23 @@ mod tests {
             assert!(!grok_split(pattern).any(|c| matches!(c, GrokComponent::PatternError(_))));
             let result = grok_split(pattern).next().unwrap();
             eprintln!("{result:?}");
+
+            let components = grok_split(pattern);
+            for c in components {
+                match c {
+                    GrokComponent::RegularExpression { string, range, .. } => {
+                        assert_eq!(&pattern[range], string);
+                    }
+                    GrokComponent::GrokPattern {
+                        pattern: pattern_str,
+                        range,
+                        ..
+                    } => {
+                        assert_eq!(&pattern[range], pattern_str);
+                    }
+                    _ => unreachable!(),
+                }
+            }
 
             // TODO: test parse results
         }
