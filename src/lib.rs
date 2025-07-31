@@ -235,7 +235,7 @@ pub mod parser {
 }
 
 /// The `Grok` struct is the main entry point into using this library.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Grok {
     #[allow(unused)]
     engine: Engine,

@@ -4,7 +4,7 @@ All user visible changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/), as described
 for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/text/1105-api-evolution.md)
 
-## 2.3.2 - 2025-07-31
+## 2.3.3 - 2025-07-31
 
  * Add `Clone` to `Grok`.
 
