@@ -4,9 +4,11 @@ All user visible changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/), as described
 for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/text/1105-api-evolution.md)
 
-## 2.3.4 - 2025-07-31
+## 2.4.0 - 2025-07-31
 
  * Fix a bug where pattern definition ranges were off-by-one.
+ * (breaking) Fix bug in UNIXPATH pattern where `.` was included rather than `\.`, causing
+   the pattern to match any character.
 
 ## 2.3.3 - 2025-07-31
 

@@ -1,6 +1,6 @@
 [package]
 name = "grok"
-version = "2.3.3"
+version = "2.4.0"
 authors = ["Matt Mastracci <matthew@mastracci.com>", "Michael Nitschinger <michael@nitschinger.at>"]
 license = "Apache-2.0"
 readme = "README.md"
