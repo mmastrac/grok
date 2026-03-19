@@ -4,6 +4,10 @@ All user visible changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/), as described
 for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/text/1105-api-evolution.md)
 
+## 2.4.1 - 2026-03-19
+
+ * Update EMAILLOCALPART (https://github.com/mmastrac/grok/issues/31, thanks @bruberg)
+
 ## 2.4.0 - 2025-07-31
 
  * Fix a bug where pattern definition ranges were off-by-one.
